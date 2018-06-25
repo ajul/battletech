@@ -20,17 +20,17 @@ def make_damage_string(data, key):
     shots = data['ShotsWhenFired']
     total_damage = damage_per_shot * shots
 
-    hidden = '<span style="display: none;">%04d</span>' % total_damage
-    shown = '%d' % total_damage
+    data_sort_value = '%d' % total_damage
+    result = 'data-sort-value="%s" | %d' % (data_sort_value, total_damage)
     if shots > 1:
-        shown += ' (%d × %d)' % (damage_per_shot, shots)
-    return hidden + shown
+        result += ' (%d × %d)' % (damage_per_shot, shots)
+    return result
 
 def make_range_string(data):
-    hidden = '<span style="display: none;">%04d</span>' % data['MaxRange']
-    shown = '%d / %d / %d' % (data['MinRange'], data['RangeSplit'][1], data['MaxRange'],)
+    data_sort_value = '%d' % data['MaxRange']
+    result = 'data-sort-value="%s" | %d / %d / %d' % (data_sort_value, data['MinRange'], data['RangeSplit'][1], data['MaxRange'],)
 
-    return hidden + shown
+    return result
 
 def make_other_string(data):
     other = []
@@ -42,13 +42,13 @@ def make_other_string(data):
         other.append('%d heat damage' % data['HeatDamage'])
 
     if len(data['statusEffects']) > 0:
-        other.append('Inflicts +1 accuracy debuff')
+        other.append('Inflicts -1 accuracy debuff')
     
     if data['RefireModifier']:
-        other.append('%d refire accuracy' % data['RefireModifier'])
+        other.append('%d refire accuracy' % -data['RefireModifier'])
 
     if data['AccuracyModifier'] != 0:
-        other.append('%+d accuracy' % data['AccuracyModifier'])
+        other.append('%+d accuracy' % -data['AccuracyModifier'])
         
     if data['CriticalChanceMultiplier'] != 1.0:
         percent = (data['CriticalChanceMultiplier'] - 1.0) * 100.0
