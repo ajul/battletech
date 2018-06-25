@@ -8,6 +8,9 @@ data_path = (
 
 weapon_path = os.path.join(data_path, 'weapon')
 
+# WeaponSubType -> stock data
+stock_weapons = {}
+
 def make_cost_string(data):
     cost = data['Description']['Cost'] // 1000
     if data['Description']['Purchasable']:
@@ -17,14 +20,27 @@ def make_cost_string(data):
 
 def make_damage_string(data, key):
     damage_per_shot = data[key]
+    stock_damage_per_shot = stock_weapons[data['WeaponSubType']][key]
+    bonus_per_shot = damage_per_shot - stock_damage_per_shot
+    
     shots = data['ShotsWhenFired']
     total_damage = damage_per_shot * shots
+    is_multi = shots > 1 and damage_per_shot > 0
 
-    data_sort_value = '%d' % total_damage
-    result = 'data-sort-value="%s" | %d' % (data_sort_value, total_damage)
-    if shots > 1:
-        result += ' (%d × %d)' % (damage_per_shot, shots)
-    return result
+    data_sort_value = 'data-sort-value="%d" | ' % total_damage
+    cell = '%d' % (total_damage)
+    
+    if is_multi:
+        if bonus_per_shot > 0:
+            cell += ' (%d+%d × %d)' % (stock_damage_per_shot, bonus_per_shot, shots)
+        else:
+            cell += ' (%d × %d)' % (damage_per_shot, shots)
+    elif bonus_per_shot > 0:
+        cell += ' (+%d)' % bonus_per_shot
+        
+    if bonus_per_shot > 0:
+        cell = '<span style="color: palegreen;">%s</span>'% cell
+    return data_sort_value + cell
 
 def make_range_string(data):
     data_sort_value = '%d' % data['MaxRange']
@@ -35,11 +51,28 @@ def make_range_string(data):
 def make_other_string(data):
     other = []
 
+    def append_other_item(key, format_string,
+                          transform = lambda x: x,
+                          default_raw = 0,
+                          bonus_format = '(%+d)'):
+        if data[key] == default_raw: return
+        stock_raw = stock_weapons[data['WeaponSubType']][key]
+
+        value = transform(data[key])
+        stock_value = transform(stock_raw)
+        bonus = value - stock_value
+            
+        item = format_string % value
+        if bonus != 0:
+            if stock_raw != default_raw:
+                item += ' ' + (bonus_format % bonus)
+            item = '<span style="color: palegreen;">%s</span>'% (item)
+        other.append(item)
+
     if data['IndirectFireCapable']:
         other.append('Indirect fire')
-    
-    if data['HeatDamage'] != 0:
-        other.append('%d heat damage' % data['HeatDamage'])
+
+    append_other_item('HeatDamage', '%d heat damage')
 
     if len(data['statusEffects']) > 0:
         other.append('Inflicts -1 accuracy debuff')
@@ -47,12 +80,13 @@ def make_other_string(data):
     if data['RefireModifier']:
         other.append('%d refire accuracy' % -data['RefireModifier'])
 
-    if data['AccuracyModifier'] != 0:
-        other.append('%+d accuracy' % -data['AccuracyModifier'])
-        
-    if data['CriticalChanceMultiplier'] != 1.0:
-        percent = (data['CriticalChanceMultiplier'] - 1.0) * 100.0
-        other.append('%+d%% critical' % percent)
+    append_other_item('AccuracyModifier', '%+d accuracy',
+                      transform = lambda x: -x)
+
+    append_other_item('CriticalChanceMultiplier', '%+d%% critical',
+                      transform = lambda x: (x - 1.0) * 100,
+                      default_raw = 1.0,
+                      bonus_format = '(+%d%%)')
 
     return '<br/>'.join(other)
 
@@ -102,6 +136,8 @@ for filename in os.listdir(weapon_path):
     f = open(path)
     data = json.load(f)
     f.close()
+
+    if 'STOCK' in filename: stock_weapons[data['WeaponSubType']] = data
     
     if data['Category'] == "Melee": continue
     if data['WeaponSubType'] == 'AIImaginary': continue
